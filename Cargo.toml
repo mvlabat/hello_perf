@@ -1,0 +1,12 @@
+[package]
+name = "hello_perf"
+version = "0.1.0"
+authors = ["mvlabat <mvlabat@gmail.com>"]
+edition = "2018"
+
+[dev-dependencies]
+criterion = "0.2"
+
+[[bench]]
+name = "cache_lines"
+harness = false
