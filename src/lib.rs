@@ -1,4 +1,5 @@
 use std::{
+    cell::UnsafeCell,
     thread,
     sync::Arc,
 };
@@ -34,14 +35,18 @@ pub fn instruction_parallel(mut arr: [i32; 2], a: i32, b: i32, c: usize) -> (i32
 }
 
 pub fn cache_line_sharing(arr: [i32; 128], pos: usize) -> (i32, i32) {
-    let arr = Arc::new(arr);
+    struct SyncWrapper(UnsafeCell<[i32; 128]>);
+    unsafe impl Sync for SyncWrapper {}
+
+    assert!(pos > 0 && pos <= 32);
+    let arr = Arc::new(SyncWrapper(UnsafeCell::new(arr)));
     let handles: Vec<_> = (0..4).map(|thread_number| {
         let arr = arr.clone();
         let pos = thread_number * pos;
         thread::spawn(move || unsafe {
-            let p = (arr.as_ptr() as *mut i32).offset(pos as isize);
+            let p: *mut i32 = &mut (*arr.0.get())[pos];
             for _ in 0..1_000_000 {
-                *p = *p.wrapping_add(3);
+                p.write_volatile(p.read_volatile().wrapping_add(3));
             }
         })
     }).collect();
@@ -50,5 +55,6 @@ pub fn cache_line_sharing(arr: [i32; 128], pos: usize) -> (i32, i32) {
         handle.join().unwrap();
     }
 
+    let arr = unsafe { *arr.0.get() };
     (arr[0], arr[1])
 }
